@@ -56,7 +56,7 @@ router.post(
       });
 
       const token = signToken(user._id);
-      setAuthCookie(res, token);
+      setAuthCookie(res, req, token);
       res.status(201).json({ user: user.toPublicJSON(user._id) });
     } catch (err) {
       res.status(500).json({ error: "Could not create account", detail: err.message });
@@ -89,7 +89,7 @@ router.post(
       }
 
       const token = signToken(user._id);
-      setAuthCookie(res, token);
+      setAuthCookie(res, req, token);
       res.json({ user: user.toPublicJSON(user._id) });
     } catch (err) {
       res.status(500).json({ error: "Could not log in", detail: err.message });
@@ -98,7 +98,7 @@ router.post(
 );
 
 router.post("/logout", (req, res) => {
-  clearAuthCookie(res);
+  clearAuthCookie(res, req);
   res.json({ ok: true });
 });
 
