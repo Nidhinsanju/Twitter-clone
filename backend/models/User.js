@@ -1,28 +1,72 @@
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+const mongoose = require("mongoose");
 
-const userSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  username: { type: String, required: true, unique: true },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  profileImage: { type: String, default: '' },
-  bio: { type: String, default: '' },
-  followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-}, { timestamps: true });
+const userSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, trim: true, maxlength: 50 },
+    username: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+      minlength: 3,
+      maxlength: 20,
+      match: /^[a-z0-9_]+$/,
+    },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+    password: { type: String, required: true, select: false },
+    bio: { type: String, default: "", maxlength: 160 },
+    location: { type: String, default: "", maxlength: 30 },
+    website: { type: String, default: "", maxlength: 100 },
+    avatarColor: { type: String, default: "#1d9bf0" },
+    banner: {
+      type: String,
+      default: "linear-gradient(135deg, #1d9bf0 0%, #7856ff 100%)",
+    },
+    profileComplete: { type: Boolean, default: false },
 
-// Hash password before saving
-userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
-});
+    // Denormalized counters. Follows live in their own collection (see
+    // models/Follow.js) so a popular account's followers can't grow an
+    // embedded array past MongoDB's 16MB document cap or serialize a huge
+    // array on every profile fetch. These counters are kept in sync with
+    // $inc alongside Follow document writes (see routes/users.routes.js)
+    // instead of computing count() on every read.
+    followersCount: { type: Number, default: 0, min: 0 },
+    followingCount: { type: Number, default: 0, min: 0 },
+    postsCount: { type: Number, default: 0, min: 0 },
+  },
+  { timestamps: true }
+);
 
-// Method to match password
-userSchema.methods.matchPassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+userSchema.index({ createdAt: -1 });
+
+// `isFollowedByMe` can no longer be derived from an embedded array, so the
+// caller looks it up (usually via a batched Follow query) and passes it in.
+userSchema.methods.toPublicJSON = function (viewerId, isFollowedByMe = false) {
+  const isMe = viewerId ? viewerId.toString() === this._id.toString() : false;
+  return {
+    id: this._id.toString(),
+    name: this.name,
+    handle: this.username,
+    ...(isMe ? { email: this.email } : {}),
+    bio: this.bio,
+    location: this.location,
+    website: this.website,
+    avatarColor: this.avatarColor,
+    banner: this.banner,
+    profileComplete: this.profileComplete,
+    followersCount: this.followersCount,
+    followingCount: this.followingCount,
+    isMe,
+    isFollowedByMe: isMe ? false : isFollowedByMe,
+    joinedAt: this.createdAt,
+  };
 };
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = mongoose.model("User", userSchema);

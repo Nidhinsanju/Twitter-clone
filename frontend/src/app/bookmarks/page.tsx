@@ -3,18 +3,18 @@
 import { Bookmark } from "lucide-react";
 import TweetList from "@/components/tweet/TweetList";
 import { useFeed } from "@/context/FeedContext";
-import { getUser, CURRENT_USER_ID } from "@/lib/mock-data";
+import { useAuth } from "@/context/AuthContext";
 
 export default function BookmarksPage() {
   const { tweets } = useFeed();
-  const me = getUser(CURRENT_USER_ID);
+  const { user } = useAuth();
   const bookmarked = tweets.filter((t) => t.bookmarked);
 
   return (
     <div>
       <div className="sticky top-0 z-10 border-b border-border bg-bg/80 px-4 py-3 backdrop-blur-md">
         <h1 className="text-xl font-extrabold">Bookmarks</h1>
-        <p className="text-[13px] text-text-secondary">@{me.handle}</p>
+        {user && <p className="text-[13px] text-text-secondary">@{user.handle}</p>}
       </div>
 
       {bookmarked.length === 0 ? (

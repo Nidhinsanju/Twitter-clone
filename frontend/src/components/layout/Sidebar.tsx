@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   Bell,
@@ -18,25 +18,34 @@ import {
 } from "lucide-react";
 import TwitterLogo from "@/components/icons/TwitterLogo";
 import Avatar from "@/components/ui/Avatar";
-import { getUser, CURRENT_USER_ID } from "@/lib/mock-data";
 import { useComposeModal } from "@/context/ComposeModalContext";
 import { useTheme } from "@/context/ThemeContext";
-
-const NAV_ITEMS = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/explore", label: "Explore", icon: Search },
-  { href: "/notifications", label: "Notifications", icon: Bell },
-  { href: "/messages", label: "Messages", icon: Mail },
-  { href: "/bookmarks", label: "Bookmarks", icon: Bookmark },
-  { href: "/profile/nidhinsanju", label: "Profile", icon: User },
-];
+import { useAuth } from "@/context/AuthContext";
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { open } = useComposeModal();
   const { theme, toggleTheme } = useTheme();
+  const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
-  const me = getUser(CURRENT_USER_ID);
+
+  if (!user) return null;
+
+  const NAV_ITEMS = [
+    { href: "/", label: "Home", icon: Home },
+    { href: "/explore", label: "Explore", icon: Search },
+    { href: "/notifications", label: "Notifications", icon: Bell },
+    { href: "/messages", label: "Messages", icon: Mail },
+    { href: "/bookmarks", label: "Bookmarks", icon: Bookmark },
+    { href: `/profile/${user.handle}`, label: "Profile", icon: User },
+  ];
+
+  async function handleLogout() {
+    setMenuOpen(false);
+    await logout();
+    router.push("/login");
+  }
 
   return (
     <div className="flex h-full flex-col justify-between px-2 py-1 xl:items-stretch items-center">
@@ -90,9 +99,7 @@ export default function Sidebar() {
             <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
             <div className="animate-slide-down absolute bottom-full left-0 z-20 mb-2 w-64 overflow-hidden rounded-2xl border border-border bg-bg shadow-[0_0_15px_rgba(101,119,134,0.2)]">
               <button
-                onClick={() => {
-                  toggleTheme();
-                }}
+                onClick={toggleTheme}
                 className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] hover:bg-hover"
               >
                 {theme === "dark" ? (
@@ -102,9 +109,12 @@ export default function Sidebar() {
                 )}
                 Switch to {theme === "dark" ? "light" : "dark"} mode
               </button>
-              <button className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] hover:bg-hover">
+              <button
+                onClick={handleLogout}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] hover:bg-hover"
+              >
                 <LogOut className="h-5 w-5" />
-                Log out @{me.handle}
+                Log out @{user.handle}
               </button>
             </div>
           </>
@@ -113,10 +123,10 @@ export default function Sidebar() {
           onClick={() => setMenuOpen((v) => !v)}
           className="flex w-full items-center gap-3 rounded-full p-3 transition-colors hover:bg-hover"
         >
-          <Avatar user={me} size="md" />
+          <Avatar user={user} size="md" />
           <div className="hidden min-w-0 flex-1 text-left xl:block">
-            <p className="truncate text-[15px] font-bold">{me.name}</p>
-            <p className="truncate text-[15px] text-text-secondary">@{me.handle}</p>
+            <p className="truncate text-[15px] font-bold">{user.name}</p>
+            <p className="truncate text-[15px] text-text-secondary">@{user.handle}</p>
           </div>
           <MoreHorizontal className="hidden h-5 w-5 xl:block" />
         </button>
