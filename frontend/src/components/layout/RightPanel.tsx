@@ -6,11 +6,14 @@ import { useEffect, useState } from "react";
 import Avatar from "@/components/ui/Avatar";
 import FollowButton from "@/components/ui/FollowButton";
 import TwitterLogo from "@/components/icons/TwitterLogo";
+import ProfileCompletionCard from "@/components/profile/ProfileCompletionCard";
 import { trends } from "@/lib/mock-data";
 import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import type { User } from "@/lib/types";
 
 export default function RightPanel() {
+  const { user } = useAuth();
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<User[]>([]);
 
@@ -34,6 +37,15 @@ export default function RightPanel() {
           />
         </div>
       </div>
+
+      {user?.profileCompletion && user.profileCompletion.percent < 100 && (
+        <Link
+          href={`/profile/${user.handle}`}
+          className="block rounded-2xl border border-border p-4 transition-colors hover:bg-hover/40"
+        >
+          <ProfileCompletionCard completion={user.profileCompletion} compact />
+        </Link>
+      )}
 
       <div className="rounded-2xl border border-border">
         <h2 className="px-4 pb-1 pt-3 text-xl font-extrabold">What&apos;s happening</h2>

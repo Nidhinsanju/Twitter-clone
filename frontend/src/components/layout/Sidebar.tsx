@@ -15,6 +15,7 @@ import {
   Sun,
   LogOut,
   Feather,
+  Sparkles,
 } from "lucide-react";
 import TwitterLogo from "@/components/icons/TwitterLogo";
 import Avatar from "@/components/ui/Avatar";
@@ -128,6 +129,12 @@ export default function Sidebar() {
             <p className="truncate text-[15px] font-bold">{user.name}</p>
             <p className="truncate text-[15px] text-text-secondary">@{user.handle}</p>
           </div>
+          {typeof user.points === "number" && (
+            <span className="hidden shrink-0 items-center gap-1 rounded-full bg-bg-secondary px-2 py-1 text-[12px] font-bold text-accent xl:flex">
+              <Sparkles className="h-3.5 w-3.5" />
+              {user.points.toLocaleString()}
+            </span>
+          )}
           <MoreHorizontal className="hidden h-5 w-5 xl:block" />
         </button>
       </div>

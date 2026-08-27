@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { computeProfileCompletion } = require("../utils/profileCompletion");
 
 const userSchema = new mongoose.Schema(
   {
@@ -29,6 +30,12 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "linear-gradient(135deg, #1d9bf0 0%, #7856ff 100%)",
     },
+    // Path (relative to the API origin, e.g. "/uploads/xxx.jpg") of an
+    // uploaded profile picture / banner photo — see middleware/upload.js.
+    // null until the user uploads one, in which case it's shown instead of
+    // avatarColor/banner (which stay as the color/gradient fallback).
+    avatarUrl: { type: String, default: null },
+    bannerUrl: { type: String, default: null },
     profileComplete: { type: Boolean, default: false },
 
     // Denormalized counters. Follows live in their own collection (see
@@ -40,6 +47,12 @@ const userSchema = new mongoose.Schema(
     followersCount: { type: Number, default: 0, min: 0 },
     followingCount: { type: Number, default: 0, min: 0 },
     postsCount: { type: Number, default: 0, min: 0 },
+
+    // Denormalized reward-points total — the ledger of individual awards
+    // (profile completion, posting, liking, commenting, retweeting) lives
+    // in RewardEvent; this is kept in sync with $inc alongside it (see
+    // services/rewards.service.js) so reads stay O(1).
+    points: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true }
 );
@@ -54,12 +67,16 @@ userSchema.methods.toPublicJSON = function (viewerId, isFollowedByMe = false) {
     id: this._id.toString(),
     name: this.name,
     handle: this.username,
-    ...(isMe ? { email: this.email } : {}),
+    ...(isMe
+      ? { email: this.email, points: this.points, profileCompletion: computeProfileCompletion(this) }
+      : {}),
     bio: this.bio,
     location: this.location,
     website: this.website,
     avatarColor: this.avatarColor,
     banner: this.banner,
+    avatarUrl: this.avatarUrl,
+    bannerUrl: this.bannerUrl,
     profileComplete: this.profileComplete,
     followersCount: this.followersCount,
     followingCount: this.followingCount,

@@ -7,10 +7,9 @@ import CharCountRing from "@/components/ui/CharCountRing";
 import { useFeed } from "@/context/FeedContext";
 import { useAuth } from "@/context/AuthContext";
 import { ApiError } from "@/lib/api";
+import { ACCEPTED_IMAGE_TYPES, validateImageFile } from "@/lib/imageUpload";
 
 const MAX = 280;
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 // The rest of the toolbar (lists, emoji, schedule, location) is presentational —
 // only image attachment is actually wired up to the backend.
@@ -52,12 +51,9 @@ export default function ComposeForm({
     e.target.value = ""; // allow picking the same file again later
     if (!file) return;
 
-    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-      setError("Only JPEG, PNG, WEBP or GIF images are allowed");
-      return;
-    }
-    if (file.size > MAX_IMAGE_BYTES) {
-      setError("Image must be smaller than 5MB");
+    const validationError = validateImageFile(file);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 

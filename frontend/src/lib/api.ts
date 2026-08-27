@@ -1,4 +1,12 @@
-import type { AppNotification, ChatMessage, Conversation, Tweet, User } from "./types";
+import type {
+  AppNotification,
+  ChatMessage,
+  Conversation,
+  RewardResult,
+  RewardsSummary,
+  Tweet,
+  User,
+} from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
@@ -49,11 +57,38 @@ export const api = {
 
   // Users
   getUser: (username: string) => request<{ user: User }>(`/api/users/${username}`),
-  updateMe: (data: Partial<Pick<User, "name" | "bio" | "location" | "website" | "avatarColor" | "banner" | "profileComplete">>) =>
-    request<{ user: User }>("/api/users/me", { method: "PATCH", body: JSON.stringify(data) }),
+  // avatarFile/bannerFile are optional uploaded photos — when either is
+  // present this sends multipart/form-data instead of JSON (mirrors
+  // createTweet's dual-path below). Passing an explicit `null` for a file
+  // field is not a "remove photo" signal here; omit the key instead.
+  updateMe: (
+    data: Partial<
+      Pick<User, "name" | "bio" | "location" | "website" | "avatarColor" | "banner" | "profileComplete">
+    > & { avatarFile?: File | null; bannerFile?: File | null }
+  ) => {
+    const { avatarFile, bannerFile, ...fields } = data;
+    if (avatarFile || bannerFile) {
+      const formData = new FormData();
+      for (const [key, value] of Object.entries(fields)) {
+        if (value !== undefined) formData.append(key, String(value));
+      }
+      if (avatarFile) formData.append("avatar", avatarFile);
+      if (bannerFile) formData.append("banner", bannerFile);
+      return request<{ user: User; reward: RewardResult | null }>("/api/users/me", {
+        method: "PATCH",
+        body: formData,
+      });
+    }
+    return request<{ user: User; reward: RewardResult | null }>("/api/users/me", {
+      method: "PATCH",
+      body: JSON.stringify(fields),
+    });
+  },
   listUsers: (limit = 10) => request<{ users: User[] }>(`/api/users?limit=${limit}`),
   follow: (username: string) =>
-    request<{ user: User }>(`/api/users/${username}/follow`, { method: "POST" }),
+    request<{ user: User; reward: RewardResult | null }>(`/api/users/${username}/follow`, {
+      method: "POST",
+    }),
   unfollow: (username: string) =>
     request<{ user: User }>(`/api/users/${username}/unfollow`, { method: "POST" }),
 
@@ -68,18 +103,29 @@ export const api = {
       const formData = new FormData();
       formData.append("content", content);
       formData.append("image", image);
-      return request<{ tweet: Tweet }>("/api/tweets", { method: "POST", body: formData });
+      return request<{ tweet: Tweet; reward: RewardResult }>("/api/tweets", {
+        method: "POST",
+        body: formData,
+      });
     }
-    return request<{ tweet: Tweet }>("/api/tweets", { method: "POST", body: JSON.stringify({ content }) });
+    return request<{ tweet: Tweet; reward: RewardResult }>("/api/tweets", {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    });
   },
   deleteTweet: (id: string) => request<{ ok: true }>(`/api/tweets/${id}`, { method: "DELETE" }),
-  like: (id: string) => request<{ tweet: Tweet }>(`/api/tweets/${id}/like`, { method: "POST" }),
+  like: (id: string) =>
+    request<{ tweet: Tweet; reward: RewardResult | null }>(`/api/tweets/${id}/like`, {
+      method: "POST",
+    }),
   retweet: (id: string) =>
-    request<{ tweet: Tweet }>(`/api/tweets/${id}/retweet`, { method: "POST" }),
+    request<{ tweet: Tweet; reward: RewardResult | null }>(`/api/tweets/${id}/retweet`, {
+      method: "POST",
+    }),
   bookmark: (id: string) =>
-    request<{ tweet: Tweet }>(`/api/tweets/${id}/bookmark`, { method: "POST" }),
+    request<{ tweet: Tweet; reward: null }>(`/api/tweets/${id}/bookmark`, { method: "POST" }),
   reply: (id: string, content: string) =>
-    request<{ tweet: Tweet }>(`/api/tweets/${id}/replies`, {
+    request<{ tweet: Tweet; reward: RewardResult }>(`/api/tweets/${id}/replies`, {
       method: "POST",
       body: JSON.stringify({ content }),
     }),
@@ -102,4 +148,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ text }),
     }),
+
+  // Rewards
+  getRewards: () => request<RewardsSummary>("/api/rewards/me"),
 };

@@ -56,6 +56,7 @@ function toPublicPost(post, { viewerId, liked = false, retweeted = false, bookma
           name: author.name,
           handle: author.username,
           avatarColor: author.avatarColor,
+          avatarUrl: author.avatarUrl,
         }
       : null,
     likes: post.likeCount,
@@ -81,6 +82,7 @@ function toReplySummary(reply) {
           name: author.name,
           handle: author.username,
           avatarColor: author.avatarColor,
+          avatarUrl: author.avatarUrl,
         }
       : null,
   };

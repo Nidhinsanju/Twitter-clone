@@ -12,7 +12,8 @@ import Avatar from "@/components/ui/Avatar";
 import FollowButton from "@/components/ui/FollowButton";
 import TweetList from "@/components/tweet/TweetList";
 import EditProfileModal from "@/components/profile/EditProfileModal";
-import { api } from "@/lib/api";
+import ProfileCompletionCard from "@/components/profile/ProfileCompletionCard";
+import { api, API_URL } from "@/lib/api";
 import { useFeed } from "@/context/FeedContext";
 import type { Tweet, User } from "@/lib/types";
 
@@ -102,7 +103,14 @@ export default function ProfilePage({
         </div>
       </div>
 
-      <div className="h-[200px] w-full" style={{ background: profile.banner }} />
+      <div
+        className="h-[200px] w-full bg-cover bg-center"
+        style={
+          profile.bannerUrl
+            ? { backgroundImage: `url(${API_URL}${profile.bannerUrl})` }
+            : { background: profile.banner }
+        }
+      />
 
       <div className="px-4">
         <div className="flex items-end justify-between">
@@ -174,7 +182,19 @@ export default function ProfilePage({
             <span className="font-bold">{profile.followersCount.toLocaleString()}</span>{" "}
             <span className="text-text-secondary">Followers</span>
           </span>
+          {profile.isMe && (
+            <span>
+              <span className="font-bold">{(profile.points ?? 0).toLocaleString()}</span>{" "}
+              <span className="text-text-secondary">Points</span>
+            </span>
+          )}
         </div>
+
+        {profile.isMe && profile.profileCompletion && profile.profileCompletion.percent < 100 && (
+          <div className="mt-4">
+            <ProfileCompletionCard completion={profile.profileCompletion} compact />
+          </div>
+        )}
       </div>
 
       <div className="mt-3 flex overflow-x-auto border-b border-border no-scrollbar">

@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import type { Tweet } from "@/lib/types";
+import type { RewardResult, Tweet } from "@/lib/types";
 
 interface FeedContextValue {
   tweets: Tweet[];
@@ -20,9 +20,23 @@ interface FeedContextValue {
 const FeedContext = createContext<FeedContextValue | null>(null);
 
 export function FeedProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [tweets, setTweets] = useState<Tweet[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Posting/liking/retweeting/replying can each earn points (see
+  // backend/services/rewards.service.js). Rather than thread the reward
+  // through every caller, just bump the points badge in place when one was
+  // actually awarded — cheap, and keeps Sidebar/RightPanel in sync without
+  // a full user refetch.
+  const applyReward = useCallback(
+    (reward: RewardResult | null | undefined) => {
+      if (reward?.awarded && reward.totalPoints !== null) {
+        updateUser((prev) => (prev ? { ...prev, points: reward.totalPoints! } : prev));
+      }
+    },
+    [updateUser]
+  );
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -48,10 +62,14 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const addTweet = useCallback(async (content: string, image?: File | null) => {
-    const { tweet } = await api.createTweet(content, image);
-    setTweets((prev) => [tweet, ...prev]);
-  }, []);
+  const addTweet = useCallback(
+    async (content: string, image?: File | null) => {
+      const { tweet, reward } = await api.createTweet(content, image);
+      setTweets((prev) => [tweet, ...prev]);
+      applyReward(reward);
+    },
+    [applyReward]
+  );
 
   // Optimistically flip a boolean+count locally, then reconcile with the server response.
   const optimisticToggle = useCallback(
@@ -59,7 +77,7 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
       id: string,
       field: "liked" | "retweeted" | "bookmarked",
       countField: "likes" | "retweets" | null,
-      apiCall: (id: string) => Promise<{ tweet: Tweet }>
+      apiCall: (id: string) => Promise<{ tweet: Tweet; reward?: RewardResult | null }>
     ) => {
       setTweets((prev) =>
         prev.map((t) =>
@@ -73,14 +91,15 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
         )
       );
       try {
-        const { tweet } = await apiCall(id);
+        const { tweet, reward } = await apiCall(id);
         setTweets((prev) => prev.map((t) => (t.id === id ? tweet : t)));
+        applyReward(reward);
       } catch {
         // Revert on failure by refetching the true state from the server.
         refresh();
       }
     },
-    [refresh]
+    [refresh, applyReward]
   );
 
   const toggleLike = useCallback(
@@ -96,10 +115,14 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
     [optimisticToggle]
   );
 
-  const addReply = useCallback(async (id: string, content: string) => {
-    const { tweet } = await api.reply(id, content);
-    setTweets((prev) => prev.map((t) => (t.id === id ? tweet : t)));
-  }, []);
+  const addReply = useCallback(
+    async (id: string, content: string) => {
+      const { tweet, reward } = await api.reply(id, content);
+      setTweets((prev) => prev.map((t) => (t.id === id ? tweet : t)));
+      applyReward(reward);
+    },
+    [applyReward]
+  );
 
   const value = useMemo(
     () => ({

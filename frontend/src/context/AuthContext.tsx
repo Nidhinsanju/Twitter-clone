@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type SetStateAction,
+} from "react";
 import { api, ApiError } from "@/lib/api";
 import type { User } from "@/lib/types";
 
@@ -16,7 +24,10 @@ interface AuthContextValue {
   login: (data: { identifier: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
-  updateUser: (user: User) => void;
+  // Accepts a value or an updater function (mirrors useState's setter), so
+  // callers that only need to tweak a field (e.g. bumping .points after a
+  // reward) don't need to hold their own copy of the current user to spread.
+  updateUser: (update: SetStateAction<User | null>) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -61,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const updateUser = useCallback((user: User) => setUser(user), []);
+  const updateUser = useCallback((update: SetStateAction<User | null>) => setUser(update), []);
 
   const value = useMemo(
     () => ({ user, loading, signup, login, logout, refreshUser, updateUser }),
