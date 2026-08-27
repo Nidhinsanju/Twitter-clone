@@ -33,6 +33,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# user-uploaded images (see middleware/upload.js) — local disk storage,
+# not meant to be committed
+/uploads
+
 # vercel
 .vercel
 

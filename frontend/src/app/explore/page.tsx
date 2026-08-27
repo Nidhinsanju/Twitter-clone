@@ -43,7 +43,19 @@ export default function ExplorePage() {
         ))}
       </div>
 
-      {tab === "Trending" ? (
+      {query.trim() ? (
+        <TweetList
+          tweets={tweets.filter((t) => {
+            const q = query.trim().toLowerCase();
+            return (
+              t.content.toLowerCase().includes(q) ||
+              t.author?.name.toLowerCase().includes(q) ||
+              t.author?.handle.toLowerCase().includes(q)
+            );
+          })}
+          emptyMessage="Try searching for something else."
+        />
+      ) : tab === "Trending" ? (
         <div>
           {trends.concat(trends).map((trend, i) => (
             <button

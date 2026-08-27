@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
-  BadgeCheck,
   BarChart3,
   Bookmark,
   Heart,
@@ -10,21 +10,40 @@ import {
   MoreHorizontal,
   Repeat2,
   Share,
+  Trash2,
 } from "lucide-react";
+import { useState } from "react";
 import Avatar from "@/components/ui/Avatar";
-import { getUser } from "@/lib/mock-data";
 import { formatCount, formatTimeAgo } from "@/lib/format";
 import { useFeed } from "@/context/FeedContext";
+import { useAuth } from "@/context/AuthContext";
+import { api, API_URL } from "@/lib/api";
 import type { Tweet as TweetType } from "@/lib/types";
 
 export default function Tweet({ tweet }: { tweet: TweetType }) {
-  const author = getUser(tweet.authorId);
-  const { toggleLike, toggleRetweet, toggleBookmark } = useFeed();
+  const { toggleLike, toggleRetweet, toggleBookmark, refresh } = useFeed();
+  const { user } = useAuth();
+  const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const author = tweet.author;
 
   const stop = (e: React.MouseEvent) => e.stopPropagation();
+  const isMine = author && user && author.id === user.id;
+
+  async function handleDelete(e: React.MouseEvent) {
+    stop(e);
+    setMenuOpen(false);
+    await api.deleteTweet(tweet.id);
+    refresh();
+  }
+
+  if (!author) return null;
 
   return (
-    <article className="flex gap-3 border-b border-border px-4 py-3 transition-colors hover:bg-hover/40">
+    <article
+      onClick={() => router.push(`/status/${tweet.id}`)}
+      className="flex cursor-pointer gap-3 border-b border-border px-4 py-3 transition-colors hover:bg-hover/40"
+    >
       <Link href={`/profile/${author.handle}`} onClick={stop} className="shrink-0">
         <Avatar user={author} size="md" />
       </Link>
@@ -39,9 +58,6 @@ export default function Tweet({ tweet }: { tweet: TweetType }) {
             >
               {author.name}
             </Link>
-            {author.verified && (
-              <BadgeCheck className="h-[18px] w-[18px] shrink-0 fill-accent text-bg" />
-            )}
             <span className="shrink-0 truncate text-text-secondary">
               @{author.handle}
             </span>
@@ -53,30 +69,59 @@ export default function Tweet({ tweet }: { tweet: TweetType }) {
               {formatTimeAgo(tweet.createdAt)}
             </span>
           </div>
-          <button
-            onClick={stop}
-            className="-mr-2 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-hover-blue hover:text-accent"
-            aria-label="More"
-          >
-            <MoreHorizontal className="h-[18px] w-[18px]" />
-          </button>
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                stop(e);
+                setMenuOpen((v) => !v);
+              }}
+              className="-mr-2 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-hover-blue hover:text-accent"
+              aria-label="More"
+            >
+              <MoreHorizontal className="h-[18px] w-[18px]" />
+            </button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={(e) => { stop(e); setMenuOpen(false); }} />
+                <div className="absolute right-0 top-full z-20 mt-1 w-48 overflow-hidden rounded-xl border border-border bg-bg py-1 shadow-[0_0_15px_rgba(101,119,134,0.2)]">
+                  {isMine ? (
+                    <button
+                      onClick={handleDelete}
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-[14px] font-medium text-danger hover:bg-danger-hover"
+                    >
+                      <Trash2 className="h-4 w-4" /> Delete
+                    </button>
+                  ) : (
+                    <div className="px-4 py-2.5 text-[14px] text-text-secondary">
+                      No actions available
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
-
-        {tweet.replyingTo && (
-          <p className="text-[15px] text-text-secondary">
-            Replying to <span className="text-accent">@{tweet.replyingTo}</span>
-          </p>
-        )}
 
         <p className="whitespace-pre-wrap break-words text-[15px] leading-normal">
           {tweet.content}
         </p>
 
-        {tweet.imageGradient && (
-          <div
-            className="mt-3 aspect-video w-full overflow-hidden rounded-2xl border border-border"
-            style={{ background: tweet.imageGradient }}
-          />
+        {tweet.imageUrl ? (
+          <div className="mt-3 w-full overflow-hidden rounded-2xl border border-border">
+            {/* eslint-disable-next-line @next/next/no-img-element -- served from the API origin, not optimizable by next/image */}
+            <img
+              src={`${API_URL}${tweet.imageUrl}`}
+              alt=""
+              className="max-h-[510px] w-full object-cover"
+            />
+          </div>
+        ) : (
+          tweet.imageGradient && (
+            <div
+              className="mt-3 aspect-video w-full overflow-hidden rounded-2xl border border-border"
+              style={{ background: tweet.imageGradient }}
+            />
+          )
         )}
 
         <div className="mt-2 flex max-w-md items-center justify-between">
@@ -84,7 +129,10 @@ export default function Tweet({ tweet }: { tweet: TweetType }) {
             icon={MessageCircle}
             count={tweet.replies}
             colorClass="hover:text-accent hover:bg-hover-blue"
-            onClick={stop}
+            onClick={(e) => {
+              stop(e);
+              router.push(`/status/${tweet.id}`);
+            }}
           />
           <ActionButton
             icon={Repeat2}
@@ -165,9 +213,9 @@ function ActionButton({
   return (
     <button
       onClick={onClick}
-      className={`group flex items-center gap-1 rounded-full text-text-secondary transition-colors ${colorClass} ${
-        active ? activeColorClass : ""
-      }`}
+      className={`group flex items-center gap-1 rounded-full transition-colors ${
+        active ? activeColorClass : "text-text-secondary"
+      } ${colorClass}`}
     >
       <span className="flex h-8 w-8 items-center justify-center rounded-full transition-colors group-hover:bg-current/10">
         <Icon

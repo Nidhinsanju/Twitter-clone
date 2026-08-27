@@ -4,8 +4,9 @@ import Script from "next/script";
 import "./globals.css";
 import { FeedProvider } from "@/context/FeedContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { AuthProvider } from "@/context/AuthContext";
 import { ComposeModalProvider } from "@/context/ComposeModalContext";
-import AppShell from "@/components/layout/AppShell";
+import AuthGate from "@/components/layout/AuthGate";
 
 const chirp = Inter({
   variable: "--font-chirp",
@@ -44,11 +45,13 @@ export default function RootLayout({
       </head>
       <body className="h-full antialiased">
         <ThemeProvider>
-          <FeedProvider>
-            <ComposeModalProvider>
-              <AppShell>{children}</AppShell>
-            </ComposeModalProvider>
-          </FeedProvider>
+          <AuthProvider>
+            <FeedProvider>
+              <ComposeModalProvider>
+                <AuthGate>{children}</AuthGate>
+              </ComposeModalProvider>
+            </FeedProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

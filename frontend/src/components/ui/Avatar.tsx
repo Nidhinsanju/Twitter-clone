@@ -13,11 +13,11 @@ export default function Avatar({
   size = "md",
   className = "",
 }: {
-  user: Pick<User, "name" | "handle">;
+  user: Partial<Pick<User, "avatarColor">> & Pick<User, "name" | "handle">;
   size?: keyof typeof SIZES;
   className?: string;
 }) {
-  const bg = colorFromString(user.handle || user.name);
+  const bg = user.avatarColor || colorFromString(user.handle || user.name);
   return (
     <div
       className={`flex shrink-0 items-center justify-center rounded-full font-bold text-white select-none ${SIZES[size]} ${className}`}

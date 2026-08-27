@@ -1,21 +1,22 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
   Calendar,
   Link as LinkIcon,
   MapPin,
-  MoreHorizontal,
 } from "lucide-react";
 import Avatar from "@/components/ui/Avatar";
 import FollowButton from "@/components/ui/FollowButton";
 import TweetList from "@/components/tweet/TweetList";
-import { getUserByHandle, CURRENT_USER_ID } from "@/lib/mock-data";
+import EditProfileModal from "@/components/profile/EditProfileModal";
+import { api } from "@/lib/api";
 import { useFeed } from "@/context/FeedContext";
+import type { Tweet, User } from "@/lib/types";
 
-const TABS = ["Posts", "Replies", "Highlights", "Media", "Likes"] as const;
+const TABS = ["Posts", "Replies", "Media", "Likes"] as const;
 
 export default function ProfilePage({
   params,
@@ -23,11 +24,29 @@ export default function ProfilePage({
   params: Promise<{ username: string }>;
 }) {
   const { username } = use(params);
-  const user = getUserByHandle(username);
-  const { tweets } = useFeed();
+  const { tweets: feedTweets } = useFeed();
+  const [profile, setProfile] = useState<User | null>(null);
+  const [userTweets, setUserTweets] = useState<Tweet[]>([]);
+  const [notFound, setNotFound] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
   const [tab, setTab] = useState<(typeof TABS)[number]>("Posts");
 
-  if (!user) {
+  useEffect(() => {
+    // Reset and reload whenever the viewed username changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    setNotFound(false);
+    Promise.all([api.getUser(username), api.getUserTweets(username)])
+      .then(([{ user }, { tweets }]) => {
+        setProfile(user);
+        setUserTweets(tweets);
+      })
+      .catch(() => setNotFound(true))
+      .finally(() => setLoading(false));
+  }, [username]);
+
+  if (notFound) {
     return (
       <div className="flex flex-col items-center gap-2 px-8 py-24 text-center">
         <p className="text-3xl font-extrabold">This account doesn&apos;t exist</p>
@@ -36,21 +55,38 @@ export default function ProfilePage({
     );
   }
 
-  const isMe = user.id === CURRENT_USER_ID;
-  const authored = tweets.filter((t) => t.authorId === user.id);
-  const liked = tweets.filter((t) => t.liked);
+  if (loading || !profile) {
+    return <div className="px-4 py-8 text-center text-text-secondary">Loading…</div>;
+  }
+
+  const repliesFromUser = feedTweets
+    .flatMap((t) =>
+      t.repliesList
+        .filter((r) => r.author?.handle === profile.handle)
+        .map((r) => ({ parent: t, reply: r }))
+    );
 
   const visibleTweets =
     tab === "Posts"
-      ? authored
+      ? userTweets
       : tab === "Likes"
-        ? liked
+        ? profile.isMe
+          ? feedTweets.filter((t) => t.liked)
+          : []
         : tab === "Media"
-          ? authored.filter((t) => t.imageGradient)
+          ? userTweets.filter((t) => t.imageUrl || t.imageGradient)
           : [];
 
   return (
     <div>
+      {editing && (
+        <EditProfileModal
+          user={profile}
+          onClose={() => setEditing(false)}
+          onSaved={(updated) => setProfile(updated)}
+        />
+      )}
+
       <div className="sticky top-0 z-10 flex items-center gap-6 border-b border-border bg-bg/80 px-4 py-2 backdrop-blur-md">
         <Link
           href="/"
@@ -59,67 +95,83 @@ export default function ProfilePage({
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div>
-          <p className="text-xl font-extrabold leading-tight">{user.name}</p>
-          <p className="text-[13px] text-text-secondary">{authored.length} posts</p>
+          <p className="text-xl font-extrabold leading-tight">{profile.name}</p>
+          <p className="text-[13px] text-text-secondary">
+            {userTweets.length} {userTweets.length === 1 ? "post" : "posts"}
+          </p>
         </div>
       </div>
 
-      <div className="h-[200px] w-full" style={{ background: user.banner }} />
+      <div className="h-[200px] w-full" style={{ background: profile.banner }} />
 
       <div className="px-4">
         <div className="flex items-end justify-between">
-          <Avatar user={user} size="xl" className="-mt-11" />
+          <Avatar user={profile} size="xl" className="-mt-11" />
           <div className="mt-3 flex items-center gap-2">
-            {isMe ? (
-              <button className="rounded-full border border-border px-4 py-1.5 text-[15px] font-bold transition-colors hover:bg-hover">
+            {profile.isMe ? (
+              <button
+                onClick={() => setEditing(true)}
+                className="rounded-full border border-border px-4 py-1.5 text-[15px] font-bold transition-colors hover:bg-hover"
+              >
                 Edit profile
               </button>
             ) : (
-              <>
-                <button className="flex h-9 w-9 items-center justify-center rounded-full border border-border transition-colors hover:bg-hover">
-                  <MoreHorizontal className="h-5 w-5" />
-                </button>
-                <FollowButton />
-              </>
+              <FollowButton
+                handle={profile.handle}
+                initialFollowing={profile.isFollowedByMe}
+                onChange={(following) =>
+                  setProfile((p) =>
+                    p
+                      ? {
+                          ...p,
+                          isFollowedByMe: following,
+                          followersCount: p.followersCount + (following ? 1 : -1),
+                        }
+                      : p
+                  )
+                }
+              />
             )}
           </div>
         </div>
 
         <div className="mt-3">
-          <p className="text-xl font-extrabold">{user.name}</p>
-          <p className="text-[15px] text-text-secondary">@{user.handle}</p>
+          <p className="text-xl font-extrabold">{profile.name}</p>
+          <p className="text-[15px] text-text-secondary">@{profile.handle}</p>
         </div>
 
-        {user.bio && <p className="mt-3 text-[15px]">{user.bio}</p>}
+        {profile.bio && <p className="mt-3 text-[15px]">{profile.bio}</p>}
 
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[15px] text-text-secondary">
-          {user.location && (
+          {profile.location && (
             <span className="flex items-center gap-1">
               <MapPin className="h-[18px] w-[18px]" />
-              {user.location}
+              {profile.location}
             </span>
           )}
-          {user.website && (
+          {profile.website && (
             <span className="flex items-center gap-1 text-accent">
               <LinkIcon className="h-[18px] w-[18px]" />
-              {user.website}
+              {profile.website}
             </span>
           )}
-          {user.joined && (
-            <span className="flex items-center gap-1">
-              <Calendar className="h-[18px] w-[18px]" />
-              Joined {user.joined}
-            </span>
-          )}
+          <span className="flex items-center gap-1">
+            <Calendar className="h-[18px] w-[18px]" />
+            Joined{" "}
+            {new Date(profile.joinedAt).toLocaleDateString("en-US", {
+              month: "long",
+              year: "numeric",
+            })}
+          </span>
         </div>
 
         <div className="mt-3 flex gap-5 text-[15px]">
           <span>
-            <span className="font-bold">{user.following?.toLocaleString()}</span>{" "}
+            <span className="font-bold">{profile.followingCount.toLocaleString()}</span>{" "}
             <span className="text-text-secondary">Following</span>
           </span>
           <span>
-            <span className="font-bold">{user.followers?.toLocaleString()}</span>{" "}
+            <span className="font-bold">{profile.followersCount.toLocaleString()}</span>{" "}
             <span className="text-text-secondary">Followers</span>
           </span>
         </div>
@@ -140,7 +192,30 @@ export default function ProfilePage({
         ))}
       </div>
 
-      <TweetList tweets={visibleTweets} />
+      {tab === "Replies" ? (
+        repliesFromUser.length === 0 ? (
+          <p className="px-8 py-16 text-center text-text-secondary">No replies yet.</p>
+        ) : (
+          repliesFromUser.map(({ parent, reply }) => (
+            <Link
+              key={reply.id}
+              href={`/status/${parent.id}`}
+              className="block border-b border-border px-4 py-3 hover:bg-hover/40"
+            >
+              <p className="text-[13px] text-text-secondary">
+                Replying to @{parent.author?.handle}
+              </p>
+              <p className="text-[15px]">{reply.content}</p>
+            </Link>
+          ))
+        )
+      ) : tab === "Likes" && !profile.isMe ? (
+        <p className="px-8 py-16 text-center text-text-secondary">
+          @{profile.handle}&apos;s likes aren&apos;t public.
+        </p>
+      ) : (
+        <TweetList tweets={visibleTweets} />
+      )}
     </div>
   );
 }
