@@ -7,7 +7,7 @@ const { requireAuth } = require("../middleware/auth");
 
 const router = express.Router();
 
-const PARTICIPANT_FIELDS = "name username avatarColor";
+const PARTICIPANT_FIELDS = "name username avatarColor avatarUrl";
 
 function handleValidation(req, res, next) {
   const errors = validationResult(req);
@@ -44,6 +44,7 @@ router.get("/", requireAuth, async (req, res) => {
           name: other.name,
           handle: other.username,
           avatarColor: other.avatarColor,
+          avatarUrl: other.avatarUrl,
         },
         lastMessage: c.lastMessageText,
         lastMessageAt: c.lastMessageAt,
@@ -73,6 +74,7 @@ router.post("/with/:username", requireAuth, async (req, res) => {
         name: target.name,
         handle: target.username,
         avatarColor: target.avatarColor,
+        avatarUrl: target.avatarUrl,
       },
       lastMessage: conversation.lastMessageText,
       lastMessageAt: conversation.lastMessageAt,

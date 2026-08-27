@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 export default function FollowButton({
   handle,
@@ -14,6 +15,7 @@ export default function FollowButton({
   size?: "sm" | "md";
   onChange?: (following: boolean) => void;
 }) {
+  const { updateUser } = useAuth();
   const [following, setFollowing] = useState(initialFollowing);
   const [hovering, setHovering] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -26,7 +28,14 @@ export default function FollowButton({
     const next = !following;
     setFollowing(next); // optimistic
     try {
-      await (next ? api.follow(handle) : api.unfollow(handle));
+      if (next) {
+        const { reward } = await api.follow(handle);
+        if (reward?.awarded && reward.totalPoints !== null) {
+          updateUser((prev) => (prev ? { ...prev, points: reward.totalPoints! } : prev));
+        }
+      } else {
+        await api.unfollow(handle);
+      }
       onChange?.(next);
     } catch {
       setFollowing(!next); // revert on failure

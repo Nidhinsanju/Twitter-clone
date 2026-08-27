@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Sparkles, X } from "lucide-react";
 import Avatar from "@/components/ui/Avatar";
-import { api, ApiError } from "@/lib/api";
+import PhotoUploadButton from "@/components/profile/PhotoUploadButton";
+import { api, ApiError, API_URL } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { AVATAR_PALETTE, BANNER_PALETTE } from "@/lib/mock-data";
 import type { User } from "@/lib/types";
@@ -24,8 +25,36 @@ export default function EditProfileModal({
   const [website, setWebsite] = useState(user.website);
   const [avatarColor, setAvatarColor] = useState(user.avatarColor);
   const [banner, setBanner] = useState(user.banner);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [earnedPoints, setEarnedPoints] = useState<number | null>(null);
+
+  // Revoke preview blob URLs whenever they're replaced or the modal unmounts.
+  useEffect(() => {
+    return () => {
+      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+    };
+  }, [avatarPreview]);
+  useEffect(() => {
+    return () => {
+      if (bannerPreview) URL.revokeObjectURL(bannerPreview);
+    };
+  }, [bannerPreview]);
+
+  function selectAvatarFile(file: File) {
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  }
+  function selectBannerFile(file: File) {
+    if (bannerPreview) URL.revokeObjectURL(bannerPreview);
+    setBannerFile(file);
+    setBannerPreview(URL.createObjectURL(file));
+  }
 
   async function handleSave() {
     if (!name.trim()) {
@@ -35,22 +64,43 @@ export default function EditProfileModal({
     setSaving(true);
     setError("");
     try {
-      const { user: updated } = await api.updateMe({
+      const { user: updated, reward } = await api.updateMe({
         name: name.trim(),
         bio,
         location,
         website,
         avatarColor,
         banner,
+        avatarFile,
+        bannerFile,
       });
       updateUser(updated);
       onSaved(updated);
-      onClose();
+      if (reward?.awarded) {
+        // Let the "you earned points" moment show briefly instead of the
+        // modal just vanishing along with the news.
+        setEarnedPoints(reward.points);
+        setTimeout(onClose, 1400);
+      } else {
+        onClose();
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't save changes");
     } finally {
       setSaving(false);
     }
+  }
+
+  if (earnedPoints !== null) {
+    return (
+      <div className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-modal-overlay">
+        <div className="animate-modal-in flex flex-col items-center gap-2 rounded-2xl bg-bg px-8 py-10 text-center">
+          <Sparkles className="h-10 w-10 text-accent" />
+          <p className="text-xl font-extrabold">Profile complete!</p>
+          <p className="text-text-secondary">You earned {earnedPoints} points.</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -82,9 +132,40 @@ export default function EditProfileModal({
           </button>
         </div>
 
-        <div className="h-32 w-full" style={{ background: banner }} />
-        <div className="px-4">
-          <Avatar user={{ ...user, avatarColor }} size="xl" className="-mt-11" />
+        <div
+          className="relative h-32 w-full bg-cover bg-center"
+          style={
+            bannerPreview
+              ? { backgroundImage: `url(${bannerPreview})` }
+              : user.bannerUrl && !bannerFile
+                ? { backgroundImage: `url(${API_URL}${user.bannerUrl})` }
+                : { background: banner }
+          }
+        >
+          <PhotoUploadButton
+            label="Upload banner image"
+            onSelect={selectBannerFile}
+            onError={setError}
+            className="absolute right-3 top-3 h-9 w-9"
+          />
+        </div>
+        <div className="relative w-fit px-4">
+          {avatarPreview ? (
+            // eslint-disable-next-line @next/next/no-img-element -- local blob preview, not a next/image-optimizable URL
+            <img
+              src={avatarPreview}
+              alt=""
+              className="-mt-11 h-[88px] w-[88px] rounded-full border-4 border-bg object-cover"
+            />
+          ) : (
+            <Avatar user={{ ...user, avatarColor }} size="xl" className="-mt-11" />
+          )}
+          <PhotoUploadButton
+            label="Upload profile picture"
+            onSelect={selectAvatarFile}
+            onError={setError}
+            className="absolute bottom-1 right-1 h-8 w-8"
+          />
         </div>
 
         <div className="flex flex-col gap-4 p-4">

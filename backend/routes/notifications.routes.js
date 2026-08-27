@@ -5,7 +5,7 @@ const { requireAuth } = require("../middleware/auth");
 
 const router = express.Router();
 
-const ACTOR_FIELDS = "name username avatarColor bio";
+const ACTOR_FIELDS = "name username avatarColor avatarUrl bio";
 
 router.get("/", requireAuth, async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 100);
@@ -37,6 +37,7 @@ router.get("/", requireAuth, async (req, res) => {
           name: n.actor.name,
           handle: n.actor.username,
           avatarColor: n.actor.avatarColor,
+          avatarUrl: n.actor.avatarUrl,
           bio: n.actor.bio,
           isFollowedByMe: followedIds.has(n.actor._id.toString()),
         },

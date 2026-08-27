@@ -46,6 +46,23 @@ function uploadImage(req, res, next) {
   });
 }
 
+// Same idea as uploadImage, but for the profile-edit form, which can carry
+// an avatar photo and/or a banner photo in the same multipart request. Both
+// are optional and independent — a request can include either, both, or
+// neither (in which case it behaves like a plain JSON PATCH).
+function uploadProfileImages(req, res, next) {
+  upload.fields([
+    { name: "avatar", maxCount: 1 },
+    { name: "banner", maxCount: 1 },
+  ])(req, res, (err) => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ error: "Image must be smaller than 5MB" });
+    }
+    return res.status(400).json({ error: err.message || "Couldn't upload image" });
+  });
+}
+
 function deleteUploadedFile(imageUrl) {
   if (!imageUrl) return;
   const filename = path.basename(imageUrl);
@@ -54,4 +71,4 @@ function deleteUploadedFile(imageUrl) {
   });
 }
 
-module.exports = { uploadImage, deleteUploadedFile, UPLOAD_DIR };
+module.exports = { uploadImage, uploadProfileImages, deleteUploadedFile, UPLOAD_DIR };

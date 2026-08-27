@@ -11,6 +11,7 @@ const userRoutes = require("./routes/users.routes");
 const tweetRoutes = require("./routes/tweets.routes");
 const notificationRoutes = require("./routes/notifications.routes");
 const conversationRoutes = require("./routes/conversations.routes");
+const rewardsRoutes = require("./routes/rewards.routes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -50,6 +51,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/tweets", tweetRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/conversations", conversationRoutes);
+app.use("/api/rewards", rewardsRoutes);
 
 // Fallback error handler so unexpected errors return JSON, not an HTML stack trace.
 app.use((err, req, res, next) => {
