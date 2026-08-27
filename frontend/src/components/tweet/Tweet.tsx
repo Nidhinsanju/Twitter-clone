@@ -46,7 +46,10 @@ export default function Tweet({ tweet }: { tweet: TweetType }) {
               @{author.handle}
             </span>
             <span className="shrink-0 text-text-secondary">·</span>
-            <span className="shrink-0 whitespace-nowrap text-text-secondary">
+            <span
+              className="shrink-0 whitespace-nowrap text-text-secondary"
+              suppressHydrationWarning
+            >
               {formatTimeAgo(tweet.createdAt)}
             </span>
           </div>

@@ -125,7 +125,7 @@ export default function MessagesPage() {
                   @{user.handle}
                 </span>
                 <span className="shrink-0 text-text-secondary">·</span>
-                <span className="shrink-0 text-text-secondary">
+                <span className="shrink-0 text-text-secondary" suppressHydrationWarning>
                   {formatTimeAgo(c.createdAt)}
                 </span>
               </div>

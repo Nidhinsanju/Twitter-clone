@@ -96,7 +96,7 @@ export default function NotificationsPage() {
                     {n.content}
                   </p>
                 )}
-                <p className="mt-1 text-[13px] text-text-secondary">
+                <p className="mt-1 text-[13px] text-text-secondary" suppressHydrationWarning>
                   {formatTimeAgo(n.createdAt)}
                 </p>
                 {n.type === "follow" && (

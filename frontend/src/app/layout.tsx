@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { FeedProvider } from "@/context/FeedContext";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -35,7 +36,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${chirp.variable} h-full`} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: themeInitScript }}
+        />
       </head>
       <body className="h-full antialiased">
         <ThemeProvider>
