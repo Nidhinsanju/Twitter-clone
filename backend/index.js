@@ -15,6 +15,11 @@ const conversationRoutes = require("./routes/conversations.routes");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Render (like most PaaS) terminates TLS at a proxy and forwards to this
+// process over plain HTTP. Without trusting the proxy, req.secure is always
+// false, which would break the HTTPS check the auth cookie relies on.
+app.set("trust proxy", 1);
+
 const DEFAULT_ALLOWED_ORIGINS = [
   "http://localhost:3000",
   "https://twitter-clone-nine-woad.vercel.app",
