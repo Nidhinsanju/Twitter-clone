@@ -9,10 +9,11 @@ const Notification = require("../models/Notification");
 const { requireAuth } = require("../middleware/auth");
 const { uploadImage, deleteUploadedFile } = require("../middleware/upload");
 const { notify } = require("../utils/notify");
+const { awardPoints } = require("../services/rewards.service");
 
 const router = express.Router();
 
-const AUTHOR_FIELDS = "name username avatarColor";
+const AUTHOR_FIELDS = "name username avatarColor avatarUrl";
 
 function handleValidation(req, res, next) {
   const errors = validationResult(req);
@@ -171,9 +172,12 @@ router.post(
       deleteUploadedFile(imageUrl); // don't leave an orphaned file if the post failed to save
       throw err;
     }
-    await User.updateOne({ _id: req.userId }, { $inc: { postsCount: 1 } });
+    const [, reward] = await Promise.all([
+      User.updateOne({ _id: req.userId }, { $inc: { postsCount: 1 } }),
+      awardPoints({ userId: req.userId, type: "post", sourceId: post._id }),
+    ]);
     const populated = await post.populate("author", AUTHOR_FIELDS);
-    res.status(201).json({ tweet: toPublicPost(populated, {}) });
+    res.status(201).json({ tweet: toPublicPost(populated, {}), reward });
   }
 );
 
@@ -187,12 +191,13 @@ router.delete("/:id", requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-async function toggleInteraction(req, res, { Model, countField, notifyType }) {
+async function toggleInteraction(req, res, { Model, countField, notifyType, rewardType }) {
   const post = await Post.findById(req.params.id).populate("author", AUTHOR_FIELDS);
   if (!post) return res.status(404).json({ error: "Post not found" });
 
   const existing = await Model.findOne({ user: req.userId, post: post._id });
   let delta = 0;
+  let reward = null;
   if (existing) {
     await existing.deleteOne();
     delta = -1;
@@ -203,14 +208,31 @@ async function toggleInteraction(req, res, { Model, countField, notifyType }) {
     } catch (err) {
       if (err.code !== 11000) throw err; // duplicate toggle race — treat as a no-op
     }
-    if (delta === 1 && notifyType) {
-      await notify({
-        recipientId: post.author._id,
-        actorId: req.userId,
-        type: notifyType,
-        postId: post._id,
-        content: post.content,
-      });
+    if (delta === 1) {
+      // Only the "add" transition earns points/notifies — un-liking or
+      // un-retweeting doesn't undo the reward (RewardEvent's unique index
+      // on {user, type, sourceId} already stops a later re-like on the
+      // same post from earning a second reward).
+      const tasks = [];
+      if (notifyType) {
+        tasks.push(
+          notify({
+            recipientId: post.author._id,
+            actorId: req.userId,
+            type: notifyType,
+            postId: post._id,
+            content: post.content,
+          })
+        );
+      }
+      if (rewardType) {
+        tasks.push(
+          awardPoints({ userId: req.userId, type: rewardType, sourceId: post._id }).then(
+            (r) => (reward = r)
+          )
+        );
+      }
+      await Promise.all(tasks);
     }
   }
 
@@ -223,17 +245,30 @@ async function toggleInteraction(req, res, { Model, countField, notifyType }) {
     getViewerFlagSets(req.userId, [post._id]),
     fetchRepliesFor(post._id),
   ]);
-  res.json({ tweet: toPublicPost(post, { ...flagsFor(flags, post._id), repliesList }) });
+  res.json({
+    tweet: toPublicPost(post, { ...flagsFor(flags, post._id), repliesList }),
+    reward,
+  });
 }
 
 router.post("/:id/like", requireAuth, (req, res) =>
-  toggleInteraction(req, res, { Model: Like, countField: "likeCount", notifyType: "like" })
+  toggleInteraction(req, res, {
+    Model: Like,
+    countField: "likeCount",
+    notifyType: "like",
+    rewardType: "like",
+  })
 );
 router.post("/:id/retweet", requireAuth, (req, res) =>
-  toggleInteraction(req, res, { Model: Retweet, countField: "retweetCount", notifyType: "retweet" })
+  toggleInteraction(req, res, {
+    Model: Retweet,
+    countField: "retweetCount",
+    notifyType: "retweet",
+    rewardType: "retweet",
+  })
 );
 router.post("/:id/bookmark", requireAuth, (req, res) =>
-  toggleInteraction(req, res, { Model: Bookmark, countField: "bookmarkCount", notifyType: null })
+  toggleInteraction(req, res, { Model: Bookmark, countField: "bookmarkCount", notifyType: null, rewardType: null })
 );
 
 router.post(
@@ -257,7 +292,7 @@ router.post(
       content: req.body.content,
       parentPost: parent._id,
     });
-    await Promise.all([
+    const [, , reward] = await Promise.all([
       User.updateOne({ _id: req.userId }, { $inc: { postsCount: 1 } }),
       notify({
         recipientId: parent.author._id,
@@ -266,6 +301,7 @@ router.post(
         postId: parent._id,
         content: reply.content,
       }),
+      awardPoints({ userId: req.userId, type: "comment", sourceId: reply._id }),
     ]);
     parent.replyCount += 1;
     await parent.save();
@@ -276,6 +312,7 @@ router.post(
     ]);
     res.status(201).json({
       tweet: toPublicPost(parent, { ...flagsFor(flags, parent._id), repliesList }),
+      reward,
     });
   }
 );

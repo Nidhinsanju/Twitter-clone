@@ -1,3 +1,4 @@
+import { API_URL } from "@/lib/api";
 import { colorFromString, initialsFromName } from "@/lib/format";
 import type { User } from "@/lib/types";
 
@@ -13,10 +14,21 @@ export default function Avatar({
   size = "md",
   className = "",
 }: {
-  user: Partial<Pick<User, "avatarColor">> & Pick<User, "name" | "handle">;
+  user: Partial<Pick<User, "avatarColor" | "avatarUrl">> & Pick<User, "name" | "handle">;
   size?: keyof typeof SIZES;
   className?: string;
 }) {
+  if (user.avatarUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- served from the API origin, not optimizable by next/image
+      <img
+        src={`${API_URL}${user.avatarUrl}`}
+        alt=""
+        className={`shrink-0 rounded-full object-cover select-none ${SIZES[size]} ${className}`}
+      />
+    );
+  }
+
   const bg = user.avatarColor || colorFromString(user.handle || user.name);
   return (
     <div
